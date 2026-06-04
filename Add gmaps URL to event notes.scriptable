@@ -1,0 +1,12 @@
+{
+  "always_run_in_app" : false,
+  "icon" : {
+    "color" : "green",
+    "glyph" : "magic"
+  },
+  "name" : "Add gmaps URL to event notes",
+  "script" : "\/\/ Add Google Maps to Events\n\/\/ Prepends a comgooglemaps:\/\/ URL to the notes of upcoming calendar events\n\/\/ that have a location, without duplicating on repeat runs.\n\nconst DAYS_AHEAD = 14;\nconst URL_SCHEME = \"comgooglemaps:\/\/?q=\";\nconst MARKER = \"[gmaps]\"; \/\/ sentinel to detect already-processed events\n\nconst calendars = await Calendar.forEvents();\n\nconst startDate = new Date();\nconst endDate = new Date();\nendDate.setDate(endDate.getDate() + DAYS_AHEAD);\n\nconst events = await CalendarEvent.between(startDate, endDate, calendars);\n\nlet updatedCount = 0;\nlet skippedNoLocation = 0;\nlet skippedAlreadyTagged = 0;\n\nfor (const event of events) {\n  if (!event.location || event.location.trim() === \"\") {\n    skippedNoLocation++;\n    continue;\n  }\n\n  const existingNotes = event.notes || \"\";\n\n  \/\/ Skip if we've already added a gmaps link to this event\n  if (existingNotes.includes(MARKER)) {\n    skippedAlreadyTagged++;\n    continue;\n  }\n\n  const gmapsUrl = URL_SCHEME + encodeURIComponent(event.location);\n  const linkLine = `${MARKER} ${gmapsUrl}`;\n\n  \/\/ Prepend to existing notes, with a blank line separator if notes exist\n  event.notes = existingNotes.trim() === \"\"\n    ? linkLine\n    : `${linkLine}\\n\\n${existingNotes.trim()}`;\n\n  try {\n    await event.save();\n    console.log(`Updated: \"${event.title}\"`);\n    updatedCount++;\n  } catch (e) {\n    console.log(`Failed to save \"${event.title}\": ${e}`);\n  }\n}\n\nconst summary = `Updated: ${updatedCount}\\nSkipped (no location): ${skippedNoLocation}\\nSkipped (already tagged): ${skippedAlreadyTagged}`;\nconsole.log(summary);\n\nif (config.runsInApp) {\n  const notif = new Notification();\n  notif.title = \"Calendar URLs Updated\";\n  notif.body = summary;\n  await notif.schedule();\n}\n\nScript.complete();",
+  "share_sheet_inputs" : [
+
+  ]
+}
